@@ -1,5 +1,5 @@
 name: "402coffee Certify"
-description: "Certify your x402 paying agent against 402.coffee on every push — proves it still completes a real payment, and can gate CI on its risk-score tier."
+description: "Certify your x402 paying agent against 402.coffee in CI — real payment test + optional risk-score gate."
 author: "402.coffee"
 branding:
   icon: "coffee"
