@@ -6,9 +6,18 @@ branding:
   color: "yellow"
 
 inputs:
+  mode:
+    description: "certify (paid, default) — run the real payment tests and mint a fresh certificate. verify (FREE) — check the wallet's existing credential is current (no spend, no secret needed if wallet-address is given); ideal for PR checks while a scheduled certify keeps the credential fresh."
+    required: false
+    default: "certify"
   wallet-key:
-    description: "Private key (0x…) of a FUNDED test wallet (a little USDC on Base; gasless, no ETH). Store it as a GitHub Actions secret and pass it here — never hard-code it."
-    required: true
+    description: "Private key (0x…) of a FUNDED test wallet (a little USDC on Base; gasless, no ETH). Store it as a GitHub Actions secret and pass it here — never hard-code it. Required for mode: certify; optional for mode: verify (wallet-address suffices)."
+    required: false
+    default: ""
+  wallet-address:
+    description: "Wallet address (0x…) to check in mode: verify — lets PR checks run with NO secret at all."
+    required: false
+    default: ""
   tests:
     description: "Comma-separated tests to run: basic, suite. Default: basic."
     required: false
@@ -26,6 +35,15 @@ outputs:
   cert-url:
     description: "Public certificate URL of the last test that ran."
     value: ${{ steps.run.outputs.cert-url }}
+  badge-url:
+    description: "README badge (SVG) URL of the last certificate."
+    value: ${{ steps.run.outputs.badge-url }}
+  badge-markdown:
+    description: "Ready-to-paste README badge markdown."
+    value: ${{ steps.run.outputs.badge-markdown }}
+  verified:
+    description: "mode: verify — true if the wallet currently holds a fresh PASS and no fresh FAIL."
+    value: ${{ steps.run.outputs.verified }}
   tier:
     description: "Risk-score tier (only set when min-tier was provided)."
     value: ${{ steps.run.outputs.tier }}
@@ -45,7 +63,9 @@ runs:
       shell: bash
       working-directory: ${{ github.action_path }}
       env:
+        INPUT_MODE: ${{ inputs.mode }}
         INPUT_WALLET_KEY: ${{ inputs.wallet-key }}
+        INPUT_WALLET_ADDRESS: ${{ inputs.wallet-address }}
         INPUT_TESTS: ${{ inputs.tests }}
         INPUT_MIN_TIER: ${{ inputs.min-tier }}
         INPUT_API_BASE: ${{ inputs.api-base }}

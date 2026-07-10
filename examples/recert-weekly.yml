@@ -1,0 +1,20 @@
+# Weekly re-certification — keeps your agent's 402.coffee credential permanently fresh.
+# Credentials are valid for 30 days; this weekly cron re-mints well before expiry, so the
+# README badge never goes stale and counterparties always see a CURRENT credential.
+name: 402coffee weekly re-cert
+on:
+  schedule:
+    - cron: "0 7 * * 1" # Mondays 07:00 UTC
+  workflow_dispatch: {}
+
+jobs:
+  recert:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: englishdoggy/certify-action@v1
+        id: cert
+        with:
+          wallet-key: ${{ secrets.X402_TEST_WALLET_KEY }} # funded test wallet — a little USDC on Base, no ETH
+          tests: basic,suite
+      - name: Show badge markdown
+        run: echo "${{ steps.cert.outputs.badge-markdown }}"

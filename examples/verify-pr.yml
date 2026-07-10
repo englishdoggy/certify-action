@@ -1,0 +1,15 @@
+# FREE PR check — no payment, no secret. Fails the PR if the agent wallet's
+# 402.coffee credential has lapsed (pair with the weekly re-cert workflow that
+# keeps it fresh). Perfect default for x402 client repos.
+name: 402coffee verify (free)
+on:
+  pull_request: {}
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: englishdoggy/certify-action@v1
+        with:
+          mode: verify
+          wallet-address: "0xYourAgentWalletAddress" # public address only — no secret needed

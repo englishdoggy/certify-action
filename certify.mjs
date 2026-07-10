@@ -9,7 +9,9 @@ import { wrapFetchWithPayment, x402Client } from "@x402/fetch";
 import { ExactEvmScheme } from "@x402/evm/exact/client";
 import { privateKeyToAccount } from "viem/accounts";
 
+const MODE = (process.env.INPUT_MODE || "certify").trim().toLowerCase();
 const KEY = process.env.INPUT_WALLET_KEY;
+const ADDR = (process.env.INPUT_WALLET_ADDRESS || "").trim();
 const BASE = (process.env.INPUT_API_BASE || "https://api.402.coffee").replace(/\/+$/, "");
 const TESTS = (process.env.INPUT_TESTS || "basic")
   .split(",").map((s) => s.trim().toLowerCase()).filter(Boolean);
@@ -29,6 +31,29 @@ function output(k, v) {
   if (process.env.GITHUB_OUTPUT) appendFileSync(process.env.GITHUB_OUTPUT, `${k}=${v}\n`);
 }
 
+// ---- mode: verify — FREE freshness check (no payment, works with just an address).
+// The retention pairing: a weekly scheduled `certify` keeps the credential fresh;
+// every PR runs this free `verify` and fails if the credential has lapsed.
+if (MODE === "verify") {
+  let address = ADDR;
+  if (!address && KEY && /^0x[0-9a-fA-F]{64}$/.test(KEY)) {
+    address = privateKeyToAccount(KEY).address;
+  }
+  if (!/^0x[0-9a-fA-F]{40}$/.test(address || "")) {
+    fail("mode: verify needs wallet-address (0x…) or wallet-key to derive it.");
+  }
+  const res = await fetch(`${BASE}/verify?wallet=${address.toLowerCase()}`);
+  const v = await res.json().catch(() => ({}));
+  const verified = v.verified === true;
+  output("verified", String(verified));
+  output("passed", String(verified));
+  summary(`## 402coffee verify (free)\n\nWallet \`${address}\`\n\n- verified: ${verified ? "✅ current PASS, no current FAIL" : "❌ not currently verified"}\n- tested: ${v.tested === true ? "yes" : "no"}\n- live check: ${BASE}/verify?wallet=${address}\n`);
+  if (!verified) fail(`wallet ${address} is not currently verified — its credential lapsed or a fresh FAIL exists. Run the paid certify (scheduled weekly keeps it fresh): https://api.402.coffee/inspect`);
+  console.log(`verify: ${address} is currently verified ✅ (free check, no spend)`);
+  process.exit(0);
+}
+
+if (MODE !== "certify") fail(`mode must be "certify" or "verify" (got "${MODE}").`);
 if (!KEY || !/^0x[0-9a-fA-F]{64}$/.test(KEY)) {
   fail("wallet-key is missing or malformed. Pass a funded test wallet's private key (0x + 64 hex) from a GitHub secret.");
 }
@@ -43,6 +68,7 @@ const payFetch = wrapFetchWithPayment(fetch, client);
 const rows = [];
 let allPassed = true;
 let lastCertUrl = "";
+let lastBadgeUrl = "";
 
 for (const test of TESTS) {
   const url = `${BASE}/test/${test}`;
@@ -50,7 +76,7 @@ for (const test of TESTS) {
     const res = await payFetch(url, { method: "POST" });
     const cert = await res.json().catch(() => ({}));
     const ok = res.ok && !!cert.cert_url;
-    if (ok) { lastCertUrl = cert.cert_url; }
+    if (ok) { lastCertUrl = cert.cert_url; if (cert.badge_url) lastBadgeUrl = cert.badge_url; }
     else { allPassed = false; }
     rows.push(`| ${test} | ${res.status} | ${ok ? "✅ conformant" : "❌ not conformant"} | ${cert.cert_url ? `[cert](${cert.cert_url})` : "—"} |`);
     console.log(`${test}: HTTP ${res.status} · ${ok ? "conformant" : "NOT conformant"} · ${cert.cert_url || ""}`);
@@ -87,6 +113,8 @@ if (MIN_TIER) {
 
 summary(`## 402coffee certification\n\nWallet \`${account.address}\`\n\n| step | http | result | link |\n|---|---|---|---|\n${rows.join("\n")}\n`);
 output("cert-url", lastCertUrl);
+output("badge-url", lastBadgeUrl);
+output("badge-markdown", lastBadgeUrl && lastCertUrl ? `[![402.coffee conformant](${lastBadgeUrl})](${lastCertUrl})` : "");
 output("tier", tier);
 output("passed", String(allPassed));
 

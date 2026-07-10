@@ -26,11 +26,33 @@ jobs:
 2. In your repo: **Settings → Secrets and variables → Actions → New secret** → name it `CERTIFY_WALLET_KEY`, value = that wallet's private key (`0x…`). **Never commit the key.**
 3. Add the workflow above.
 
+## The v2 pattern: free PR checks + weekly paid re-cert
+
+Credentials are valid for **30 days**. The recommended setup pairs two workflows so the badge never goes stale and PRs cost nothing:
+
+```yaml
+# 1) every PR — FREE, no secret at all (mode: verify just checks freshness)
+- uses: englishdoggy/certify-action@v1
+  with:
+    mode: verify
+    wallet-address: "0xYourAgentWallet"
+
+# 2) weekly cron — paid re-cert keeps the credential fresh (see examples/recert-weekly.yml)
+- uses: englishdoggy/certify-action@v1
+  with:
+    wallet-key: ${{ secrets.CERTIFY_WALLET_KEY }}
+    tests: basic,suite
+```
+
+Copy-paste workflows: [`examples/verify-pr.yml`](examples/verify-pr.yml) · [`examples/recert-weekly.yml`](examples/recert-weekly.yml)
+
 ## Inputs
 
 | input | required | default | what |
 |---|---|---|---|
-| `wallet-key` | yes | — | private key of a funded test wallet (from a secret) |
+| `mode` | no | `certify` | `certify` (paid, mints a fresh cert) or `verify` (FREE freshness check) |
+| `wallet-key` | certify only | — | private key of a funded test wallet (from a secret) |
+| `wallet-address` | no | — | `mode: verify` with just a public address — zero secrets |
 | `tests` | no | `basic` | comma list: `basic`, `suite` |
 | `min-tier` | no | — | `A`–`F`; fail the job below this tier (adds a $0.10 score lookup) |
 | `api-base` | no | `https://api.402.coffee` | advanced/testing |
@@ -40,8 +62,10 @@ jobs:
 | output | what |
 |---|---|
 | `cert-url` | public certificate URL of the last test |
-| `tier` | risk-score tier (when `min-tier` was set) |
-| `passed` | `true` if every test was conformant and the tier gate passed |
+| `badge-url` | README badge (SVG) of the last certificate |
+| `badge-markdown` | ready-to-paste `[![…](badge)](cert)` markdown |
+| `verified` | `mode: verify` — `true` if the credential is current |
+| `passed` | `true` if every test/gate passed |
 
 ## What it costs
 Real USDC on Base, per run: `basic` $0.25, `suite` $0.75, plus $0.10 if `min-tier` is set. Keep the test wallet funded. Use `on:` triggers deliberately (e.g. only on `main` or a weekly schedule) if you want to limit spend.
