@@ -1,0 +1,54 @@
+name: "402coffee Certify"
+description: "Certify your x402 paying agent against 402.coffee on every push — proves it still completes a real payment, and can gate CI on its risk-score tier."
+author: "402.coffee"
+branding:
+  icon: "coffee"
+  color: "yellow"
+
+inputs:
+  wallet-key:
+    description: "Private key (0x…) of a FUNDED test wallet (a little USDC on Base; gasless, no ETH). Store it as a GitHub Actions secret and pass it here — never hard-code it."
+    required: true
+  tests:
+    description: "Comma-separated tests to run: basic, suite. Default: basic."
+    required: false
+    default: "basic"
+  min-tier:
+    description: "Optional. Fail the job if the wallet's 402.coffee /score tier is below this (A, B, C, D, or F). Setting this pays $0.10 for one score lookup."
+    required: false
+    default: ""
+  api-base:
+    description: "API base URL (advanced/testing)."
+    required: false
+    default: "https://api.402.coffee"
+
+outputs:
+  cert-url:
+    description: "Public certificate URL of the last test that ran."
+    value: ${{ steps.run.outputs.cert-url }}
+  tier:
+    description: "Risk-score tier (only set when min-tier was provided)."
+    value: ${{ steps.run.outputs.tier }}
+  passed:
+    description: "true if every test was conformant and the tier gate (if any) passed."
+    value: ${{ steps.run.outputs.passed }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Set up Node
+      uses: actions/setup-node@v4
+      with:
+        node-version: "20"
+    - name: Run 402coffee certification
+      id: run
+      shell: bash
+      working-directory: ${{ github.action_path }}
+      env:
+        INPUT_WALLET_KEY: ${{ inputs.wallet-key }}
+        INPUT_TESTS: ${{ inputs.tests }}
+        INPUT_MIN_TIER: ${{ inputs.min-tier }}
+        INPUT_API_BASE: ${{ inputs.api-base }}
+      run: |
+        npm install --no-audit --no-fund --silent
+        node certify.mjs

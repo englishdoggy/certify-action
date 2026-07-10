@@ -1,0 +1,16 @@
+# Example consumer workflow. Copy this into your OWN repo (not needed inside the action repo).
+name: certify agent
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "0 6 * * 1"   # weekly, keeps the certificate fresh
+jobs:
+  certify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: englishdoggy/certify-action@v1
+        with:
+          wallet-key: ${{ secrets.CERTIFY_WALLET_KEY }}
+          tests: basic
+          min-tier: B
